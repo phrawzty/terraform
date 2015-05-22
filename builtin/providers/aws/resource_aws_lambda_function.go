@@ -46,7 +46,8 @@ func resourceAwsLambdaFunction() *schema.Resource {
 			},
 			"runtime": &schema.Schema{
 				Type:     schema.TypeString,
-				Required: true,
+				Required: false,
+				Default:  "nodejs",
 			},
 			"timeout": &schema.Schema{
 				Type:     schema.TypeInt,
@@ -78,17 +79,27 @@ func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) e
 
 	svc := lambda.New(nil)
 
+	memory_size := d.Get("memory_size")
+	memory_size_int := memory_size.(int)
+	memory_size_int64 := int64(memory_size_int)
+	memory_size_long := aws.Long(memory_size_int64)
+
+	timeout := d.Get("timeout")
+	timeout_int := timeout.(int)
+	timeout_int64 := int64(timeout_int)
+	timeout_long := aws.Long(timeout_int64)
+
 	params := &lambda.CreateFunctionInput{
 		Code: &lambda.FunctionCode{
-			ZipFile: []byte(d.Get("code").(string)),
+			ZipFile: []byte("blah"),
 		},
 		Description:  aws.String(d.Get("description").(string)),
 		FunctionName: aws.String(d.Get("function_name").(string)),
 		Handler:      aws.String(d.Get("handler").(string)),
-		MemorySize:   aws.Long(d.Get("memory_size").(int64)),
+		MemorySize:   memory_size_long,
 		Role:         aws.String(d.Get("role").(string)),
 		Runtime:      aws.String(d.Get("runtime").(string)),
-		Timeout:      aws.Long(d.Get("timeout").(int64)),
+		Timeout:      timeout_long,
 	}
 
 	resp, err := svc.CreateFunction(params)
