@@ -59,13 +59,15 @@ func resourceAwsLambdaFunction() *schema.Resource {
 // readZip reads a zipfile and returns the zip data as a base64-encoded byte
 // array so you can upload it to the Lambda service.
 func readZip(filename string) ([]byte, error) {
-
 	data, err := ioutil.ReadFile(filename)
-	b64size = ceil(len(data)/3) * 4
-	target := make([]byte, b64size)
 	if err != nil {
-		return target, err
+		return []byte{}, err
 	}
+	// Base64 is 4/3 the original size of data, and we'll padd with +1 in case
+	// integer math rounds down. This may be larger than we need but it won't
+	// need to be resized.
+	b64size := (len(data)/3 + 1) * 4
+	target := make([]byte, b64size)
 	base64.StdEncoding.Encode(target, data)
 	return target, nil
 }
