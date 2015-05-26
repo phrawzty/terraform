@@ -26,7 +26,7 @@ func resourceAwsLambdaFunction() *schema.Resource {
 			},
 			"description": &schema.Schema{
 				Type:     schema.TypeString,
-				Required: false,
+				Optional: true,
 			},
 			"function_name": &schema.Schema{
 				Type:     schema.TypeString,
@@ -38,7 +38,7 @@ func resourceAwsLambdaFunction() *schema.Resource {
 			},
 			"memory_size": &schema.Schema{
 				Type:     schema.TypeInt,
-				Required: false,
+				Optional: true,
 			},
 			"role": &schema.Schema{
 				Type:     schema.TypeString,
@@ -46,12 +46,12 @@ func resourceAwsLambdaFunction() *schema.Resource {
 			},
 			"runtime": &schema.Schema{
 				Type:     schema.TypeString,
-				Required: false,
+				Optional: true,
 				Default:  "nodejs",
 			},
 			"timeout": &schema.Schema{
 				Type:     schema.TypeInt,
-				Required: false,
+				Optional: true,
 			},
 		},
 	}
