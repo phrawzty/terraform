@@ -1,8 +1,6 @@
 package aws
 
 import (
-	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 
 	"github.com/awslabs/aws-sdk-go/aws"
@@ -39,6 +37,7 @@ func resourceAwsLambdaFunction() *schema.Resource {
 			"memory_size": &schema.Schema{
 				Type:     schema.TypeInt,
 				Optional: true,
+				Default:  128,
 			},
 			"role": &schema.Schema{
 				Type:     schema.TypeString,
@@ -52,25 +51,10 @@ func resourceAwsLambdaFunction() *schema.Resource {
 			"timeout": &schema.Schema{
 				Type:     schema.TypeInt,
 				Optional: true,
+				Default:  3,
 			},
 		},
 	}
-}
-
-// readZip reads a zipfile and returns the zip data as a base64-encoded byte
-// array so you can upload it to the Lambda service.
-func readFileAsBase64(filename string) ([]byte, error) {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return []byte{}, err
-	}
-	// Base64 is 4/3 the original size of data, and we'll padd with +1 in case
-	// integer math rounds down. This may be larger than we need but it won't
-	// need to be resized.
-	b64size := (len(data)/3 + 1) * 4
-	target := make([]byte, b64size)
-	base64.StdEncoding.Encode(target, data)
-	return target, nil
 }
 
 // resourceAwsLambdaFunction maps to:
@@ -78,11 +62,14 @@ func readFileAsBase64(filename string) ([]byte, error) {
 func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) error {
 	lambdaconn := meta.(*AWSClient).lambdaconn
 
-	fmt.Println(lambdaconn)
+	zipfile, err := ioutil.ReadFile(d.Get("filename").(string))
+	if err != nil {
+		return err
+	}
 
 	params := &lambda.CreateFunctionInput{
 		Code: &lambda.FunctionCode{
-			ZipFile: []byte("blah"),
+			ZipFile: zipfile,
 		},
 		Description:  aws.String(d.Get("description").(string)),
 		FunctionName: aws.String(d.Get("function_name").(string)),
@@ -96,8 +83,8 @@ func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) e
 	resp, err := lambdaconn.CreateFunction(params)
 
 	functionName := resp.FunctionName
-	fmt.Println(functionName)
-	fmt.Println(resp)
+	// fmt.Println(functionName)
+	// fmt.Println(resp)
 
 	// Do something with resp
 
