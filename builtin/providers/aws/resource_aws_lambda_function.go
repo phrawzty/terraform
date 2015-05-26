@@ -59,7 +59,7 @@ func resourceAwsLambdaFunction() *schema.Resource {
 
 // readZip reads a zipfile and returns the zip data as a base64-encoded byte
 // array so you can upload it to the Lambda service.
-func readZip(filename string) ([]byte, error) {
+func readFileAsBase64(filename string) ([]byte, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return []byte{}, err
@@ -76,18 +76,9 @@ func readZip(filename string) ([]byte, error) {
 // resourceAwsLambdaFunction maps to:
 // CreateFunction in the API / SDK
 func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) error {
+	lambdaconn := meta.(*AWSClient).lambdaconn
 
-	svc := lambda.New(nil)
-
-	memory_size := d.Get("memory_size")
-	memory_size_int := memory_size.(int)
-	memory_size_int64 := int64(memory_size_int)
-	memory_size_long := aws.Long(memory_size_int64)
-
-	timeout := d.Get("timeout")
-	timeout_int := timeout.(int)
-	timeout_int64 := int64(timeout_int)
-	timeout_long := aws.Long(timeout_int64)
+	fmt.Println(lambdaconn)
 
 	params := &lambda.CreateFunctionInput{
 		Code: &lambda.FunctionCode{
@@ -96,13 +87,13 @@ func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) e
 		Description:  aws.String(d.Get("description").(string)),
 		FunctionName: aws.String(d.Get("function_name").(string)),
 		Handler:      aws.String(d.Get("handler").(string)),
-		MemorySize:   memory_size_long,
+		MemorySize:   aws.Long(int64(d.Get("memory_size").(int))),
 		Role:         aws.String(d.Get("role").(string)),
 		Runtime:      aws.String(d.Get("runtime").(string)),
-		Timeout:      timeout_long,
+		Timeout:      aws.Long(int64(d.Get("timeout").(int))),
 	}
 
-	resp, err := svc.CreateFunction(params)
+	resp, err := lambdaconn.CreateFunction(params)
 
 	functionName := resp.FunctionName
 	fmt.Println(functionName)
