@@ -1,7 +1,9 @@
 package aws
 
 import (
+	"fmt"
 	"io/ioutil"
+	"log"
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	_ "github.com/awslabs/aws-sdk-go/aws/awserr"
@@ -29,6 +31,7 @@ func resourceAwsLambdaFunction() *schema.Resource {
 			"function_name": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true,
 			},
 			"handler": &schema.Schema{
 				Type:     schema.TypeString,
@@ -53,6 +56,14 @@ func resourceAwsLambdaFunction() *schema.Resource {
 				Optional: true,
 				Default:  3,
 			},
+			"arn": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"last_modified": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 		},
 	}
 }
@@ -60,7 +71,11 @@ func resourceAwsLambdaFunction() *schema.Resource {
 // resourceAwsLambdaFunction maps to:
 // CreateFunction in the API / SDK
 func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) error {
-	lambdaconn := meta.(*AWSClient).lambdaconn
+	conn := meta.(*AWSClient).lambdaconn
+
+	functionName := d.Get("function_name").(string)
+
+	log.Printf("[DEBUG] Fetching Lambda Function: %s", functionName)
 
 	zipfile, err := ioutil.ReadFile(d.Get("filename").(string))
 	if err != nil {
@@ -72,7 +87,7 @@ func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) e
 			ZipFile: zipfile,
 		},
 		Description:  aws.String(d.Get("description").(string)),
-		FunctionName: aws.String(d.Get("function_name").(string)),
+		FunctionName: aws.String(functionName),
 		Handler:      aws.String(d.Get("handler").(string)),
 		MemorySize:   aws.Long(int64(d.Get("memory_size").(int))),
 		Role:         aws.String(d.Get("role").(string)),
@@ -80,31 +95,76 @@ func resourceAwsLambdaFunctionCreate(d *schema.ResourceData, meta interface{}) e
 		Timeout:      aws.Long(int64(d.Get("timeout").(int))),
 	}
 
-	resp, err := lambdaconn.CreateFunction(params)
+	_, err = conn.CreateFunction(params)
+	if err != nil {
+		return fmt.Errorf("Error creating Lambda function: %s", err)
+	}
+	d.SetId(d.Get("function_name").(string))
 
-	functionName := resp.FunctionName
-	// fmt.Println(functionName)
-	// fmt.Println(resp)
-
-	// Do something with resp
-
-	return err
+	return resourceAwsLambdaFunctionRead(d, meta)
 }
 
 // resourceAwsLambdaFunctionRead maps to:
 // GetFunction in the API / SDK
 func resourceAwsLambdaFunctionRead(d *schema.ResourceData, meta interface{}) error {
+	conn := meta.(*AWSClient).lambdaconn
+
+	log.Printf("[DEBUG] Fetching Lambda Function: %s", d.Id())
+
+	params := &lambda.GetFunctionInput{
+		FunctionName: aws.String(d.Get("function_name").(string)),
+	}
+
+	getFunctionOutput, err := conn.GetFunction(params)
+	if err != nil {
+		return err
+	}
+
+	// getFunctionOutput.Code.Location is a pre-signed URL pointing at the zip
+	// file that we uploaded when we created the resource. You can use it to
+	// download the code from AWS. The other part is
+	// getFunctionOutput.Configuration which holds metadata.
+
+	function := getFunctionOutput.Configuration
+	d.Set("arn", function.FunctionARN)
+	d.Set("description", function.Description)
+	d.Set("handler", function.Handler)
+	d.Set("memory_size", function.MemorySize)
+	d.Set("last_modified", function.LastModified)
+	d.Set("role", function.Role)
+	d.Set("runtime", function.Runtime)
+	d.Set("timeout", function.Timeout)
+
+	fmt.Println(getFunctionOutput.Configuration.FunctionARN)
+
 	return nil
 }
 
 // resourceAwsLambdaFunction maps to:
 // DeleteFunction in the API / SDK
 func resourceAwsLambdaFunctionDelete(d *schema.ResourceData, meta interface{}) error {
+	conn := meta.(*AWSClient).lambdaconn
+
+	log.Printf("[INFO] Deleting Lambda Function: %s", d.Id())
+
+	params := &lambda.DeleteFunctionInput{
+		FunctionName: aws.String(d.Get("function_name").(string)),
+	}
+
+	_, err := conn.DeleteFunction(params)
+	if err != nil {
+		return fmt.Errorf("Error deleting Lambda Function: %s", err)
+	}
+
+	d.SetId("")
+
 	return nil
 }
 
 // resourceAwsLambdaFunctionUpdate maps to:
 // UpdateFunctionCode in the API / SDK
 func resourceAwsLambdaFunctionUpdate(d *schema.ResourceData, meta interface{}) error {
+	// conn := meta.(*AWSClient).lambdaconn
+
 	return nil
 }
